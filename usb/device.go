@@ -114,6 +114,7 @@ func (d *Device) Close() error {
 	defer d.lock.Unlock()
 	for iface := range d.claimed {
 		C.libusb_release_interface(d.handle, C.int(iface))
+		C.libusb_attach_kernel_driver(d.handle, C.int(iface))
 	}
 	C.libusb_close(d.handle)
 	d.handle = nil
@@ -181,6 +182,12 @@ found:
 		if errno := C.libusb_set_configuration(d.handle, C.int(conf)); errno < 0 {
 			return nil, fmt.Errorf("usb: setcfg: %s", usbError(errno))
 		}
+	}
+
+	// Detach kernel driver if platform supported
+	if errno := C.libusb_detach_kernel_driver(d.handle, C.int(iface));
+		errno < 0 && errno != C.LIBUSB_ERROR_NOT_SUPPORTED {
+		return nil, fmt.Errorf("usb: detachkrndrv: %s", usbError(errno))
 	}
 
 	// Claim the interface
